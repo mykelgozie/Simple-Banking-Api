@@ -138,7 +138,8 @@ namespace Bank.Application.Services
                 {
                     FirstName = user.FirstName,
                     LastName = user.LastName,
-                    Email = user.Email
+                    Email = user.Email,
+                    UserId = userId
                 };
 
                 return ApiResponse<RegisterUserResponse>.Ok(response, "User found successfully.");

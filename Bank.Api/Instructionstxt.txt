@@ -1,0 +1,2 @@
+﻿•	Register a user via the registration endpoint to create the first account (the app auto-creates an account on registration).
+•	Use the login endpoint to get a JWT and test authorized endpoints with the Authorization: Bearer <token> header.

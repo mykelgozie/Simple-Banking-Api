@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace Bank.Api.Controllers
 {
 
-    [Authorize]
+  //  [Authorize]
     [Route("api/v1/[controller]")]
     [ApiController]
     public class TransferController : ControllerBase
@@ -22,6 +22,13 @@ namespace Bank.Api.Controllers
         public async Task<IActionResult> BankTranfer([FromBody] TransferRequest transferRequest)
         {
             var result = await _finacialService.Transfer(transferRequest);
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+
+        [HttpPost("interbank-event")]
+        public async Task<IActionResult> BankTranferEvent([FromBody] TransferRequest transferRequest)
+        {
+            var result = await _finacialService.PublishTransaction(transferRequest);
             return result.Success ? Ok(result) : BadRequest(result);
         }
 

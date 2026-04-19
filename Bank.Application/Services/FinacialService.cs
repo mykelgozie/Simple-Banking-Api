@@ -1,9 +1,13 @@
-﻿using Bank.Application.Interface;
+﻿using Bank.Application.Event;
+using Bank.Application.Interface;
+using Bank.Domain.Constants;
 using Bank.Domain.Dtos.Request;
 using Bank.Domain.Dtos.Response;
 using Bank.Domain.Entities;
 using Bank.Domain.Enums;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Bank.Application.Services
 {
@@ -14,14 +18,16 @@ namespace Bank.Application.Services
         private readonly IAccountService _accountService;
         private readonly ILogger<FinacialService> _logger;
         private readonly IAuthService _authService;
+        private readonly IKafkaProducer _kafkaProducer;
 
-        public FinacialService(IUnitOfWork unitOfWork, ITransactionService transactionService, IAccountService accountService, ILogger<FinacialService> logger, IAuthService authService)
+        public FinacialService(IUnitOfWork unitOfWork, ITransactionService transactionService, IAccountService accountService, ILogger<FinacialService> logger, IAuthService authService, IKafkaProducer kafkaProducer)
         {
             _unitOfWork = unitOfWork;
             _transactionService = transactionService;
             _accountService = accountService;
             _logger = logger;
             _authService = authService;
+            _kafkaProducer = kafkaProducer;
         }
 
 
@@ -228,6 +234,95 @@ namespace Bank.Application.Services
                     Message = "An error occurred while processing the credit transaction. Please try again later."
                 };
             }
+        }
+
+
+        public async Task<ApiResponse<string>> ValidateWalletTransaction(TransferRequest transferRequest)
+        {
+            try
+            {
+
+                if (transferRequest.Amount <= 0)
+                {
+                    return new ApiResponse<string>
+                    {
+                        Success = false,
+                        Message = "Amount must be greater than zero."
+                    };
+                }
+
+                var isValidAccountResponse = await _accountService.ValidateBankAccount(transferRequest.SenderAccount, transferRequest.ReceiverAccount);
+                if (!isValidAccountResponse.Success)
+                {
+                    return new ApiResponse<string>
+                    {
+                        Success = false,
+                        Message = isValidAccountResponse.Message,
+                        Errors = isValidAccountResponse.Errors
+                    };
+                }
+
+                _logger.LogInformation("Bank accounts validated successfully for sender account {SenderAccount} and receiver account {ReceiverAccount}", transferRequest.SenderAccount, transferRequest.ReceiverAccount);
+
+                var user = await _authService.GetUserById(transferRequest.UserId);
+                if (user == null)
+                {
+                    return new ApiResponse<string>
+                    {
+                        Success = false,
+                        Message = "Unauthorized access to the sender account."
+                    };
+                }
+
+                return new ApiResponse<string>
+                {
+                    Success = true,
+                    Message = "Wallet transaction validated successfully."
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while validating the wallet transaction.");
+                return new ApiResponse<string>
+                {
+                    Success = false,
+                    Message = "An error occurred while validating the wallet transaction. Please try again later."
+                };
+            }
+        }
+
+        public async Task<ApiResponse<string>> PublishTransaction(TransferRequest transferRequest)
+        {
+            try
+            {
+                var validateResponse = await ValidateWalletTransaction(transferRequest);
+                if (!validateResponse.Success)
+                {
+                    _logger.LogWarning("Wallet transaction validation failed for user {UserId} with message: {Message}", transferRequest.UserId, validateResponse.Message);
+                    return validateResponse;
+                }
+
+                _logger.LogInformation("Publishing transaction for user {UserId} with transaction ID {TransactionId}", transferRequest.UserId, transferRequest.TransactionId);
+
+
+                await _kafkaProducer.SendAsync(EventTopics.Transactions, JsonSerializer.Serialize(transferRequest));
+                return new ApiResponse<string>
+                {
+                    Success = true,
+                    Message = "Processing Transaction."
+                };
+
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "An error occurred while publishing the transaction request {request}.", JsonSerializer.Serialize(transferRequest));
+                return new ApiResponse<string>
+                {
+                    Success = false,
+                    Message = "An error occurred while processing the transaction. Please try again later."
+                };
+            }
+
         }
     }
 }

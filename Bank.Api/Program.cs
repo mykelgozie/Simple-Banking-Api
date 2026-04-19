@@ -1,7 +1,9 @@
 
+using Bank.Application.Event;
 using Bank.Application.Interface;
 using Bank.Application.Repository;
 using Bank.Application.Services;
+using Bank.Domain.Configs;
 using Bank.Domain.Dtos.SettingsModels;
 using Bank.Domain.Entities;
 using Bank.Infrastructure.Persistence;
@@ -36,6 +38,8 @@ namespace Bank.Api
             builder.Services.AddScoped<IFinacialService, FinacialService>();
             builder.Services.AddScoped<ITransactionService, TransactionService>();
             builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+            builder.Services.AddHostedService<KafkaConsumerService>();
+            builder.Services.AddScoped<IKafkaProducer, KafkaProducer>();
             builder.Services.AddEndpointsApiExplorer();
 
             builder.Services.AddSwaggerGen(c =>
@@ -69,6 +73,8 @@ namespace Bank.Api
                     });
             });
 
+
+            builder.Services.Configure<KafkaSettings>(builder.Configuration.GetSection("Kafka"));
 
             var jwtSettings = builder.Configuration.GetSection("JWT").Get<JwtSettings>();
             builder.Services.Configure<JwtSettings>(builder.Configuration.GetSection("JWT"));

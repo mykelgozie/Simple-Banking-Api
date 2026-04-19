@@ -20,6 +20,7 @@ namespace Bank.Tests
         private readonly Mock<IAccountService> _accountServiceMock;
         private readonly Mock<ILogger<FinacialService>> _loggerMock;
         private readonly Mock<IAuthService> _authServiceMock;
+        private readonly Mock<IKafkaProducer> _kafkaProducerMock;
         private readonly FinacialService _service;
 
         public FinacialServiceTests()
@@ -29,13 +30,14 @@ namespace Bank.Tests
             _accountServiceMock = new Mock<IAccountService>();
             _loggerMock = new Mock<ILogger<FinacialService>>();
             _authServiceMock = new Mock<IAuthService>();
-
+            _kafkaProducerMock = new Mock<IKafkaProducer>();
             _service = new FinacialService(
                 _uowMock.Object,
                 _transactionServiceMock.Object,
                 _accountServiceMock.Object,
                 _loggerMock.Object,
-                _authServiceMock.Object
+                _authServiceMock.Object,
+                _kafkaProducerMock.Object
             );
         }
 
@@ -162,7 +164,7 @@ namespace Bank.Tests
                 .Setup(a => a.ValidateBankAccount(req.SenderAccount, req.ReceiverAccount))
                 .ReturnsAsync(ApiResponse<string>.Ok("Accounts are valid"));
 
-            _auth_service_setup:
+        _auth_service_setup:
             _authServiceMock
                 .Setup(a => a.GetUserById(req.UserId))
                 .ReturnsAsync(CreateUser());
